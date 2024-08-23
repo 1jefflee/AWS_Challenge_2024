@@ -1,0 +1,105 @@
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
+}
+
+/* Added styles for the sidebar and content area */
+.app-container {
+  display: flex;
+  height: 100vh;
+  box-sizing: border-box;
+}
+
+.sidebar {
+  width: 200px;
+  background-color: #ffffff;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  /* Keeps the sidebar fixed on scroll */
+  height: 100%;
+  /* Full height */
+  color: black;
+  /* Sets text color to black */
+}
+
+.sidebar a {
+  margin-bottom: 10px;
+  color: #000;
+  /* Default link color */
+  text-decoration: none;
+  /* Removes underline */
+}
+
+.sidebar a:hover {
+  text-decoration: underline;
+  /* Adds underline on hover */
+  color: #555;
+  /* Darken link color on hover */
+}
+
+.content {
+  background-color: #ffffff;
+  flex: 1;
+  padding: 20px;
+  margin-left: 220px;
+  /* Offset content to the right of the sidebar */
+  color: black;
+  /* Sets text color to black */
+}
+
+.patient-dropdown-container {
+  width: 100%;
+  /* Ensures the div takes up the full width of its container */
+}
+
+.patient-select {
+  width: 100%;
+  /* Ensures the select box takes up the full width of the div */
+  padding: 1px;
+  /* Adds some padding for a better appearance */
+  box-sizing: border-box;
+  /* Ensures padding is included in the element's width and height */
+}
