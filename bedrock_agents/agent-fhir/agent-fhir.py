@@ -89,7 +89,7 @@ def lambda_handler(event, context):
     next_url = get_next_url(combined_bundle)
     if next_url:
         # Combine results from paginated FHIR responses
-        combined_bundle = fetch_and_combine_fhir_results(combined_bundle)
+        combined_bundle = fetch_and_combine_fhir_results(combined_bundle, event)
 
     # Extract details from the combined bundle
     extracted_details = []
@@ -98,6 +98,9 @@ def lambda_handler(event, context):
     if apiPath == '/Observation' and combined_bundle.get("resourceType") == "Bundle" and len(combined_bundle.get('entry', [])) > 4:
         extracted_details = extract_observation_details(combined_bundle)
         bodyText = f"Observation results: {json.dumps(extracted_details)}"
+    elif apiPath == '/Encounter' and combined_bundle.get("resourceType") == "Bundle" and len(combined_bundle.get('entry', [])) > 4:
+        extracted_details = extract_encounter_details(combined_bundle)
+        bodyText = f"Encounter results: {json.dumps(extracted_details)}"
     else:
         extracted_details = combined_bundle
         bodyText = json.dumps(extracted_details)
@@ -126,12 +129,13 @@ def lambda_handler(event, context):
     return function_api_response
 
 
-def fetch_and_combine_fhir_results(initial_bundle):
+def fetch_and_combine_fhir_results(initial_bundle, event):
     """
     Follows the 'next' link in the FHIR bundle, fetching and combining all pages of results.
     
     Args:
         initial_bundle (dict): The initial FHIR bundle received from the server.
+        event (dict): The lambda event
 
     Returns:
         dict: A combined FHIR bundle with all entries from the paginated results.
@@ -140,13 +144,34 @@ def fetch_and_combine_fhir_results(initial_bundle):
     entries = combined_bundle.get("entry", [])  # Collect the initial entries
     logger.info(f"Current #entries before combine: {len(entries)}")
 
-    # Follow the 'next' link if it exists
+    # Add initial entries to unique_ids to avoid duplicates
+    unique_ids = {}
+    for entry in entries:
+        entry_id = entry.get('resource', {}).get('id')
+        if entry_id:
+            unique_ids[entry_id] = 1
+
+    # Follow the 'next' link if it exists. There seems to be a bug where next URLs are generated no matter what for some resources.
     next_url = get_next_url(combined_bundle)
-    #logger.info(f"Next URL is: {next_url}")
     
     signer = get_aws_sigv4(id_token)
 
+    apiPath = event['apiPath']
+    httpMethod = event['httpMethod']
+    parameters = event.get('parameters', [])
+    param_count = None
+    for param in parameters:
+        if param.get('name') in ['_count', 'count']:
+            param_count = int(param.get('value', None))
+
+    if param_count and len(entries) >= param_count:
+        logger.info(f"Reached the param_count limit: {param_count}")
+        return(combined_bundle)
+
+    next_count = 0
     while next_url:
+        next_count = 1
+        old_url = next_url
         # Parse the next URL
         parsed_url = urllib.parse.urlparse(next_url)
         # Reconstruct the base URL without query parameters
@@ -156,8 +181,13 @@ def fetch_and_combine_fhir_results(initial_bundle):
         # Flatten the query params for use in the request
         flattened_query_params = {k: v[0] for k, v in query_params.items()}
 
+        md5_hash_object = hashlib.md5()
+        md5_hash_object.update(flattened_query_params['page'].encode('utf-8'))
+        hex_digest = md5_hash_object.hexdigest()
+        logger.info(f"next URL page MD5  digest: {hex_digest}")
+
         # Prepare the request with proper signing
-        request = AWSRequest(method="GET", url=base_url, params=flattened_query_params, headers={'Content-Type': 'application/json'})
+        request = AWSRequest(method=httpMethod, url=base_url, params=flattened_query_params, headers={'Content-Type': 'application/json'})
         signer.add_auth(request)
         prepped = request.prepare()
 
@@ -167,13 +197,36 @@ def fetch_and_combine_fhir_results(initial_bundle):
     
         next_bundle = r.json()
 
-        # Combine the entries from the next bundle with the existing entries
+        # Combine the entries from the next bundle with the existing entries, after deduping
         new_entries = next_bundle.get("entry", [])
-        logger.info(f"New entries added: {len(new_entries)}")
-        entries.extend(new_entries)
+        added_entries = 0
+        deduped_entries = 0
+        
+        for entry in new_entries:
+            entry_id = entry.get('resource', {}).get('id')
+            if entry_id and entry_id not in unique_ids:
+                unique_ids[entry_id] = 1
+                entries.append(entry)
+                added_entries += 1
+            elif entry_id:
+                deduped_entries += 1
+
+        logger.info(f"New unique entries added: {added_entries} Entries deduped: {deduped_entries}")
+
+        # Break if the number of entries exceeds param_count
+        if param_count and len(entries) >= param_count:
+            logger.info(f"Reached the param_count limit: {param_count}")
+            break
+        # Break if the number of retrievals exceeds 50
+        if next_count >= 50:
+            logger.info(f"Reached the next_count limit: {next_count}")
+            break
 
         # Check if there is another 'next' link
         next_url = get_next_url(next_bundle)
+        if next_url == old_url:
+            logger.warning("Next URL is the same as the previous one, stopping to avoid infinite loop.")
+            next_url = None
 
     # Update the original bundle with the combined entries
     combined_bundle["entry"] = entries
@@ -258,6 +311,67 @@ def extract_observation_details(data):
     
     return observations
 
+def extract_encounter_details(data):
+    """
+    Takes Encounter entries from a FHIR bundle and flattens them into a table format.
+
+    Args:
+        data (dict): The FHIR bundle JSON data containing Encounter resources.
+
+    Returns:
+        list: A list of lists where each inner list represents a row in the table, including
+              a header row followed by rows with encounter details. The columns in the table are:
+              - Date: The start date of the encounter (first 10 characters of the period.start).
+              - Type: The display name of the encounter type.
+              - Class: The code representing the class of the encounter.
+              - Reason: The display name of the reason for the encounter.
+              - Provider: The display name of the first participant in the encounter.
+              - ServiceProvider: The display name of the service provider organization.
+
+    Output:
+        [
+            ["Date", "Type", "Class", "Reason", "Provider", "ServiceProvider"],
+            ["2020-03-19", "Hospital admission for isolation (procedure)", "IMP", "COVID-19", "Dr. Gerri75 Jacobs452", "MORTON HOSPITAL"]
+        ]
+    """
+    encounters = []
+    # Add a header row
+    encounters.append(["Date", "Visit Type", "Patient Class", "Reason", "Provider", "Institution"])
+    
+    # Loop through each entry
+    for entry in data.get("entry", []):
+        resource = entry.get("resource", {})
+        
+        # Check if the resourceType is "Encounter"
+        if resource.get("resourceType") == "Encounter":
+            # Extract the start date and get the first 10 characters for the date
+            period = resource.get("period", {})
+            start_date = period.get("start", "")
+            date = start_date[:10]  # Extract the date part
+            
+            # Extract the type display name
+            type_list = resource.get("type", [])
+            encounter_type = type_list[0].get("coding", [])[0].get("display") if type_list else "unknown"
+            
+            # Extract the class code
+            encounter_class = resource.get("class", {}).get("code", "unknown")
+            
+            # Extract the reason display name
+            reason_list = resource.get("reasonCode", [])
+            reason = reason_list[0].get("coding", [])[0].get("display") if reason_list else "unknown"
+            
+            # Extract the provider name (first participant)
+            participants = resource.get("participant", [])
+            provider = participants[0].get("individual", {}).get("display", "unknown") if participants else "unknown"
+            
+            # Extract the service provider display name
+            service_provider = resource.get("serviceProvider", {}).get("display", "unknown")
+            
+            # Append the extracted details to the encounters list
+            encounters.append([date, encounter_type, encounter_class, reason, provider, service_provider])
+    
+    return encounters
+
 def get_secret_hash(username, CLIENT_ID, CLIENT_SECRET):
     msg = username + CLIENT_ID
     dig = hmac.new(str(CLIENT_SECRET).encode('utf-8'), 
@@ -339,3 +453,45 @@ def get_aws_sigv4(id_token):
     credentials = session.get_credentials().get_frozen_credentials()
     signer = SigV4Auth(credentials, 'healthlake', region)
     return signer
+
+def hash_json_entry(json_entry):
+    """
+    Hashes a JSON entry to produce a unique hash value.
+
+    Args:
+        json_entry (dict): The JSON entry to be hashed.
+
+    Returns:
+        str: A hash value representing the JSON entry.
+    """
+    # Serialize the JSON entry to a canonical string
+    json_string = json.dumps(json_entry, sort_keys=True)
+    
+    # Hash the serialized string using SHA-256
+    hash_object = hashlib.sha256(json_string.encode('utf-8'))
+    
+    # Return the hexadecimal representation of the hash
+    return hash_object.hexdigest()
+
+def add_entry_to_dict(json_entry, entry_dict):
+    """
+    Adds a JSON entry to a dictionary if it is not already present.
+
+    Args:
+        json_entry (dict): The JSON entry to add.
+        entry_dict (dict): The dictionary to store unique JSON entries.
+
+    Returns:
+        bool: True if the entry was added, False if it was a duplicate.
+    """
+    # Hash the JSON entry
+    entry_hash = hash_json_entry(json_entry)
+    
+    # Check if the hash already exists in the dictionary
+    if entry_hash not in entry_dict:
+        # If not, add the entry and return True
+        entry_dict[entry_hash] = json_entry.id
+        return True
+    else:
+        logger.warning(f"Resource {json_entry.id} detected! Deduped")
+        return False
