@@ -1,0 +1,30 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "VisualEditor0",
+            "Effect": "Allow",
+            "Action": [
+                "healthlake:ListFHIRImportJobs",
+                "healthlake:DescribeFHIRExportJob",
+                "healthlake:ReadResource",
+                "healthlake:ListTagsForResource",
+                "healthlake:DescribeFHIRImportJob",
+                "healthlake:SearchWithGet",
+                "healthlake:DescribeFHIRDatastore",
+                "healthlake:DescribeFHIRExportJobWithGet",
+                "healthlake:SearchWithPost",
+                "healthlake:ListFHIRExportJobs",
+                "healthlake:SearchEverything",
+                "healthlake:GetCapabilities"
+            ],
+            "Resource": "arn:aws:healthlake:us-east-1:<account ID>:datastore/fhir/<datastore ID>"
+        },
+        {
+            "Sid": "VisualEditor1",
+            "Effect": "Allow",
+            "Action": "healthlake:ListFHIRDatastores",
+            "Resource": "*"
+        }
+    ]
+}

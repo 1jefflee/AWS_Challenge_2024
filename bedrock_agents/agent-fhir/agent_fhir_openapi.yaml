@@ -1,0 +1,295 @@
+"openapi": "3.0.0"
+"info":
+  "title": "Amazon HealthLake FHIR Server API"
+  "description": "Conformance statement for the Amazon HealthLake FHIR server"
+  "version": "1.1.1"
+  "termsOfService": "https://aws.amazon.com/healthlake/"
+  "contact":
+    "name": "Amazon HealthLake"
+  "license":
+    "name": "Apache 2.0"
+    "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
+"servers":
+  - "url": "https://healthlake.us-east-1.amazonaws.com/datastore/8c80024d6f9beb3384619098d8688d61/r4/"
+"paths":
+  "/Patient":
+    "get":
+      "summary": "Search and retrieve Patient resources"
+      "description": "Retrieve Patient resources based on search parameters."
+      "parameters":
+        - "name": "identifier"
+          "in": "query"
+          "description": "A unique identifier for the patient resource."
+          "required": false
+          "schema":
+            "type": "string"
+        - "name": "birthdate"
+          "in": "query"
+          "description": "Patient's birthdate."
+          "required": false
+          "schema":
+            "type": "string"
+        - "name": "gender"
+          "in": "query"
+          "description": "Patient's gender."
+          "required": false
+          "schema":
+            "type": "string"
+        - "name": "family"
+          "in": "query"
+          "description": "Family name of the patient."
+          "required": false
+          "schema":
+            "type": "string"
+        - "name": "given"
+          "in": "query"
+          "description": "Given name of the patient."
+          "required": false
+          "schema":
+            "type": "string"
+        - "name": "address"
+          "in": "query"
+          "description": "Full address of the patient."
+          "required": false
+          "schema":
+            "type": "string"
+        - "name": "address-city"
+          "in": "query"
+          "description": "City in the patient's address."
+          "required": false
+          "schema":
+            "type": "string"
+        - "name": "address-postalcode"
+          "in": "query"
+          "description": "Postal code in the patient's address."
+          "required": false
+          "schema":
+            "type": "string"
+        - "name": "telecom"
+          "in": "query"
+          "description": "Contact details such as phone or email."
+          "required": false
+          "schema":
+            "type": "string"
+      "responses":
+        "200":
+          "description": "A list of Patient resources matching the search criteria."
+          "content":
+            "application/fhir+json":
+              "schema":
+                "type": "object"
+                "description": "A bundle of Patient resources."
+  "/Encounter":
+    "get":
+      "summary": "Search and retrieve Encounter resources"
+      "description": "Retrieve Encounter resources based on search parameters."
+      "parameters":
+        - "name": "subject"
+          "in": "query"
+          "description": "Reference to the patient involved in the encounter."
+          "required": false
+          "schema":
+            "type": "string"
+        - "name": "date"
+          "in": "query"
+          "description":
+            "Date or date range when the observation was recorded. This parameter supports the following operations: \
+            **Exact Date**: Use `yyyy-mm-dd` format to retrieve observations recorded on that specific date. \
+            **Before a Date**: Use the `lt` or `le` prefixes (e.g., `lt2024-01-01` or `le2024-01-01`) to find observations recorded before or up to that date. \
+            **After a Date**: Use the `gt` or `ge` prefixes (e.g., `gt2024-01-01` or `ge2024-01-01`) to find observations recorded after or from that date. \
+            **Date Range**: Combine two date queries to define a range (e.g., `ge2024-01-01&le2024-12-31` to find observations recorded within the year 2024)."
+          "required": false
+          "schema":
+            "type": "string"
+      "responses":
+        "200":
+          "description": "A list of Encounter resources matching the search criteria."
+          "content":
+            "application/fhir+json":
+              "schema":
+                "type": "object"
+                "description": "A bundle of Encounter resources."
+  "/Observation":
+    "get":
+      "summary": "Search and retrieve Observation resources"
+      "description": "Retrieve Observation resources based on search parameters."
+      "parameters":
+        - "name": "subject"
+          "in": "query"
+          "description": "Reference to the patient for whom the observations are recorded."
+          "required": false
+          "schema":
+            "type": "string"
+        - "name": "date"
+          "in": "query"
+          "description":
+            "Date or date range when the observation was recorded. This parameter supports the following operations: \
+            **Exact Date**: Use `yyyy-mm-dd` format to retrieve observations recorded on that specific date. \
+            **Before a Date**: Use the `lt` or `le` prefixes (e.g., `lt2024-01-01` or `le2024-01-01`) to find observations recorded before or up to that date. \
+            **After a Date**: Use the `gt` or `ge` prefixes (e.g., `gt2024-01-01` or `ge2024-01-01`) to find observations recorded after or from that date. \
+            **Date Range**: Combine two date queries to define a range (e.g., `ge2024-01-01&le2024-12-31` to find observations recorded within the year 2024)."
+          "required": false
+          "schema":
+            "type": "string"
+        - "name": "_sort"
+          "in": "query"
+          "description": "Specifies the field(s) by which to sort the results. \
+            **Ascending Order**: Use the field name directly (e.g., `date`) to sort in ascending order. \
+            **Descending Order**: Prefix the field name with a hyphen (e.g., `-date`) to sort in descending order. \
+            **Multiple Fields**: Separate field names by commas to sort by multiple fields (e.g., `date,-status`)."
+          "required": false
+          "schema":
+            "type": "string"
+        - "name": "code"
+          "in": "query"
+          "description": "The LOINC code(s) to filter the observations. You can specify multiple codes separated by commas."
+          "required": false
+          "schema":
+            "type": "string"
+            "enum":
+              - "789-8: Erythrocytes [#/volume] in Blood by Automated count"
+              - "8302-2: Body Height"
+              - "6690-2: WBC Auto (Bld) [#/Vol]"
+              - "6189-5: White oak IgE Ab in Serum"
+              - "85354-9: Blood Pressure"
+              - "92138-7: Parainfluenza virus 3 RNA [Presence] in Respiratory specimen by NAA with probe detection"
+              - "92142-9: Influenza virus A RNA [Presence] in Respiratory specimen by NAA with probe detection"
+              - "72166-2: Tobacco smoking status NHIS"
+              - "3094-0: Urea nitrogen [Mass/volume] in Serum or Plasma"
+              - "1751-7: Albumin [Mass/volume] in Serum or Plasma"
+              - "92140-3: Parainfluenza virus 1 RNA [Presence] in Respiratory specimen by NAA with probe detection"
+              - "2885-2: Protein [Mass/volume] in Serum or Plasma"
+              - "9843-4: Head Occipital-frontal circumference"
+              - "736-9: Lymphocytes/100 leukocytes in Blood by Automated count"
+              - "786-4: MCHC [Mass/volume] by Automated count"
+              - "1988-5: C reactive protein [Mass/volume] in Serum or Plasma"
+              - "32207-3: Platelet distribution width [Entitic volume] in Blood by Automated count"
+              - "5905-5: Monocytes/100 leukocytes in Blood by Automated count"
+              - "711-2: Eosinophils [#/volume] in Blood by Automated count"
+              - "92130-4: Rhinovirus RNA [Presence] in Respiratory specimen by NAA with probe detection"
+              - "4548-4: Hemoglobin A1c/Hemoglobin.total in Blood"
+              - "713-8: Eosinophils/100 leukocytes in Blood by Automated count"
+              - "2744-1: pH of Arterial blood"
+              - "48065-7: Fibrin D-dimer FEU [Mass/volume] in Platelet poor plasma"
+              - "770-8: Neutrophils/100 leukocytes in Blood by Automated count"
+              - "19926-5: FEV1/FVC"
+              - "5902-2: Prothrombin time (PT)"
+              - "21000-5: RDW - Erythrocyte distribution width Auto (RBC) [Entitic vol]"
+              - "70274-6: Generalized anxiety disorder 7 item (GAD-7) total score [Reported.PHQ]"
+              - "2069-3: Chloride"
+              - "6299-2: Urea Nitrogen"
+              - "69453-9: Cause of Death [US Standard Certificate of Death]"
+              - "6075-6: Cladosporium herbarum IgE Ab in Serum"
+              - "8867-4: Heart rate"
+              - "788-0: Erythrocyte distribution width [Ratio] by Automated count"
+              - "2157-6: Creatine kinase [Enzymatic activity/volume] in Serum or Plasma"
+              - "17861-6: Calcium [Mass/volume] in Serum or Plasma"
+              - "2708-6: Oxygen saturation in Arterial blood"
+              - "94040-3: Adenovirus A+B+C+D+E DNA [Presence] in Respiratory specimen by NAA with probe detection"
+              - "718-7: Hemoglobin [Mass/volume] in Blood"
+              - "59576-9: Body mass index (BMI) [Percentile] Per age and gender"
+              - "92131-2: Respiratory syncytial virus RNA [Presence] in Respiratory specimen by NAA with probe detection"
+              - "77606-2: Weight-for-length Per age and sex"
+              - "742-7: Monocytes [#/volume] in Blood by Automated count"
+              - "6768-6: Alkaline phosphatase [Enzymatic activity/volume] in Serum or Plasma"
+              - "2571-8: Triglycerides"
+              - "94531-1: SARS-CoV-2 RNA Pnl Resp NAA+probe"
+              - "92141-1: Influenza virus B RNA [Presence] in Respiratory specimen by NAA with probe detection"
+              - "706-2: Basophils/100 leukocytes in Blood by Automated count"
+              - "2075-0: Chloride [Moles/volume] in Serum or Plasma"
+              - "92139-5: Parainfluenza virus 2 RNA [Presence] in Respiratory specimen by NAA with probe detection"
+              - "80382-5: Influenza virus A Ag [Presence] in Nasopharynx by Rapid immunoassay"
+              - "731-0: Lymphocytes [#/volume] in Blood by Automated count"
+              - "2823-3: Potassium [Moles/volume] in Serum or Plasma"
+              - "751-8: Neutrophils [#/volume] in Blood by Automated count"
+              - "89579-7: Troponin I.cardiac [Mass/volume] in Serum or Plasma by High sensitivity method"
+              - "1960-4: Bicarbonate [Moles/volume] in Arterial blood"
+              - "2703-7: Oxygen [Partial pressure] in Arterial blood"
+              - "6085-5: Common Ragweed IgE Ab in Serum"
+              - "20565-8: Carbon Dioxide"
+              - "82667-7: Total score [DAST-10]"
+              - "93025-5: Protocol for Responding to and Assessing Patients' Assets, Risks, and Experiences [PRAPARE]"
+              - "6248-9: Soybean IgE Ab in Serum"
+              - "98979-8: Glomerular filtration rate/1.73 sq M (CKD-EPI 2021), also called eGFR"
+              - "6276-0: Wheat IgE Ab in Serum"
+              - "38483-4: Creatinine"
+              - "2947-0: Sodium"
+              - "6095-4: American house dust mite IgE Ab in Serum"
+              - "39156-5: Body Mass Index"
+              - "2019-8: Carbon dioxide [Partial pressure] in Arterial blood"
+              - "21000-5: Erythrocyte distribution width [Entitic volume] by Automated count"
+              - "1920-8: Aspartate aminotransferase [Enzymatic activity/volume] in Serum or Plasma"
+              - "49765-1: Calcium"
+              - "777-3: Platelets [#/volume] in Blood by Automated count"
+              - "4544-3: Hematocrit [Volume Fraction] of Blood by Automated count"
+              - "2951-2: Sodium [Moles/volume] in Serum or Plasma"
+              - "33959-8: Procalcitonin [Mass/volume] in Serum or Plasma"
+              - "6690-2: Leukocytes [#/volume] in Blood by Automated count"
+              - "2028-9: Carbon dioxide, total [Moles/volume] in Serum or Plasma"
+              - "33914-3: Glomerular filtration rate/1.73 sq M.predicted"
+              - "92134-6: Human metapneumovirus RNA [Presence] in Respiratory specimen by NAA with probe detection"
+              - "1742-6: Alanine aminotransferase [Enzymatic activity/volume] in Serum or Plasma"
+              - "2276-4: Ferritin [Mass/volume] in Serum or Plasma"
+              - "6158-0: Latex IgE Ab in Serum"
+              - "704-7: Basophils [#/volume] in Blood by Automated count"
+              - "32623-1: Platelet mean volume [Entitic volume] in Blood by Automated count"
+              - "19994-3: Oxygen/Inspired gas setting [Volume Fraction] Ventilator"
+              - "55758-7: Patient Health Questionnaire 2 item (PHQ-2) total score [Reported]"
+              - "18262-6: Low Density Lipoprotein Cholesterol"
+              - "6246-3: Shrimp IgE Ab in Serum"
+              - "2339-0: Glucose"
+              - "7258-7: Cow milk IgE Ab in Serum"
+              - "6106-9: Egg white IgE Ab in Serum"
+              - "6273-7: Walnut IgE Ab in Serum"
+              - "9279-1: Respiratory rate"
+              - "72514-3: Pain severity - 0-10 verbal numeric rating [Score] - Reported"
+              - "1975-2: Bilirubin.total [Mass/volume] in Serum or Plasma"
+              - "29463-7: Body Weight"
+              - "2345-7: Glucose [Mass/volume] in Serum or Plasma"
+              - "785-6: MCH [Entitic mass] by Automated count"
+              - "787-2: MCV [Entitic volume] by Automated count"
+              - "14804-9: Lactate dehydrogenase [Enzymatic activity/volume] in Serum or Plasma by Lactate to pyruvate reaction"
+              - "8310-5: Body temperature"
+              - "80383-3: Influenza virus B Ag [Presence] in Nasopharynx by Rapid immunoassay"
+              - "2085-9: High Density Lipoprotein Cholesterol"
+              - "6301-6: INR in Platelet poor plasma by Coagulation assay"
+              - "2093-3: Total Cholesterol"
+              - "20570-8: Hematocrit [Volume Fraction] of Blood"
+              - "6833-8: Cat dander IgE Ab in Serum"
+              - "6844-5: Honey bee IgE Ab in Serum"
+              - "6298-4: Potassium"
+              - "6206-7: Peanut IgE Ab in Serum"
+              - "6082-2: Codfish IgE Ab in Serum"
+        - "name": "encounter"
+          "in": "query"
+          "description": "Reference to the encounter associated with the observation."
+          "required": false
+          "schema":
+            "type": "string"
+      "responses":
+        "200":
+          "description": "A list of Observation resources matching the search criteria."
+          "content":
+            "application/fhir+json":
+              "schema":
+                "type": "object"
+                "description": "A bundle of Observation resources."
+"components":
+  "securitySchemes":
+    "OAuth2":
+      "type": "oauth2"
+      "flows":
+        "authorizationCode":
+          "authorizationUrl": ""
+          "tokenUrl": ""
+          "scopes":
+            "user/*.read": "Read user data"
+"security":
+  - "OAuth2": []
+"tags":
+  - "name": "Patient"
+    "description": "Patient-related resources and operations"
+  - "name": "Encounter"
+    "description": "Encounter-related resources and operations"
+  - "name": "Observation"
+    "description": "Observation-related resources and operations"
