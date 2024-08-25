@@ -2,6 +2,7 @@ import json
 import boto3
 import os
 import time
+from datetime import datetime
 import logging
 
 logger = logging.getLogger()
@@ -55,7 +56,11 @@ def lambda_handler(event, context):
         patient_id = 'f0bfa360-a7b8-a4ff-1ba4-1dc9952c2e05'
 
     #append patient_id to prompt
-    inputText += "\n\npatient_id:" + patient_id 
+    inputText += "\n\npatient_id:" + patient_id
+    
+    #append the current date to the prompt
+    current_date = datetime.now().strftime('%Y-%m-%d')
+    inputText += "\ncurrent_date:" + current_date
 
     # Define the prompt flow. To get this info:
     #client = boto3.client(service_name='bedrock-agent')
@@ -90,27 +95,54 @@ def lambda_handler(event, context):
     # Format duration to "X.X seconds"
     formatted_duration = f"{duration:.1f} seconds"
     
-    result = {}
+    result = {
+        'flowCompletionEvents': [],
+        'flowOutputDocuments': []
+    }
+    
     for event in response.get("responseStream"):
-        result.update(event)
-        
-    if result['flowCompletionEvent']['completionReason'] == 'SUCCESS':
-        print("Prompt flow invocation was successful! The output of the prompt flow is as follows:\n")
-        print(result['flowOutputEvent']['content']['document'])
-        return {
-            'statusCode': 200,
-            'headers': headers,
-            'body': json.dumps({
-                'answer': result['flowOutputEvent']['content']['document'],
-                'duration': formatted_duration
-            })
-        }
+        logger.info("Event: %s", event)
+    
+        # Check if it's a flow completion event and append it to the list
+        if 'flowCompletionEvent' in event:
+            result['flowCompletionEvents'].append(event['flowCompletionEvent'])
+    
+        # Check if it's a flow output event and append the document content to the list
+        if 'flowOutputEvent' in event:
+            content = event['flowOutputEvent']['content'].get('document')
+            nodeName = event['flowOutputEvent'].get('nodeName')
+            if content:
+                # Wrap the content with <p></p> tags
+                wrapped_content = f"{nodeName}:<p>{content}</p>"
+                result['flowOutputDocuments'].append(wrapped_content)
+    
+    logger.info("Result: %s", result)
+    
+    # Check if there is a successful flow completion event
+    successful_completion = any(e['completionReason'] == 'SUCCESS' for e in result['flowCompletionEvents'])
+    
+    if successful_completion:
+        # Concatenate all the flow output documents if successful
+        if result['flowOutputDocuments']:
+            output_content = "<br/>".join(result['flowOutputDocuments'])
+            print("Prompt flow invocation was successful! The output of the prompt flow is as follows:\n")
+            print(output_content)
+            return {
+                'statusCode': 200,
+                'headers': headers,
+                'body': json.dumps({
+                    'answer': output_content,
+                    'duration': formatted_duration
+                })
+            }
     else:
+        # If none of the flowCompletionEvents are successful, return an error
+        completion_reasons = ", ".join(e['completionReason'] for e in result['flowCompletionEvents'])
         return {
             'statusCode': 400,
             'headers': headers,
             'body': json.dumps({
                 'duration': formatted_duration,
-                'error': "The prompt flow invocation completed because of the following reason: " + result['flowCompletionEvent']['completionReason']
+                'error': "The prompt flow invocation completed because of the following reasons: " + completion_reasons
             })
         }

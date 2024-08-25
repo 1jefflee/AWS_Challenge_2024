@@ -1,5 +1,5 @@
 #root {
-  max-width: 1280px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 2rem;
   text-align: center;
@@ -88,6 +88,13 @@
   /* Offset content to the right of the sidebar */
   color: black;
   /* Sets text color to black */
+}
+
+.content-area {
+  flex: 1;
+  height: 90%;
+  overflow-y: auto;
+  /* Allows scrolling if content exceeds height */
 }
 
 .patient-dropdown-container {

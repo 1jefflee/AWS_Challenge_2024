@@ -57,19 +57,28 @@ id_token = None
 
 def lambda_handler(event, context):
     logger.info(f"Received event: {json.dumps(event)}")
-    actionGroup = event['actionGroup']
     apiPath = event['apiPath']
     httpMethod = event['httpMethod']
     parameters = event.get('parameters', [])
-    messageVersion = event['messageVersion']
 
     requestBody = {}
+    required_params = {'subject', 'identifier', 'id', '_id'}
+    # Flag to check if any required param is present
+    has_req_param = False
     for param in parameters:
+        if param_name in required_params:
+            has_req_param = True
         if param['name'] == 'code' and param['value']:
             orig = param['value']
             # Regex to remove spaces after commas
             param['value'] = re.sub(r',\s+', ',', orig)
         requestBody[param['name']] = param['value']
+
+
+    # Check if none of the required parameters were provided
+    if not has_req_param:
+        err_msg = json.dumps({'error': 'At least one of the parameters must be one of (subject, identifier, id, _id).'})
+        return function_api_response(event, 400, err_msg)
 
     signer = get_aws_sigv4(id_token)
 
@@ -105,29 +114,59 @@ def lambda_handler(event, context):
         extracted_details = combined_bundle
         bodyText = json.dumps(extracted_details)
 
+    return function_api_response(event, 200, bodyText)
+
+def function_api_response(event: dict, statusCode: int, responseText: str):
+    """
+    Constructs a standardized API response based on the provided event details and status.
+
+    Args:
+        event (dict): The event dictionary containing details about the API request.
+                      Expected keys include:
+                      - 'actionGroup' (str): The action group name.
+                      - 'apiPath' (str): The API path being accessed.
+                      - 'httpMethod' (str): The HTTP method used (e.g., GET, POST).
+                      - 'messageVersion' (str): The version of the message format.
+
+        statusCode (int): The HTTP status code to be included in the response (e.g., 200, 400).
+        
+        responseText (str): The text to be included in the response body under the "TEXT" key.
+
+    Returns:
+        dict: A dictionary representing the API response structure, including the action group, 
+              API path, HTTP method, status code, response body, and message version.
+    
+    Example:
+        event = {
+            'actionGroup': 'action-group-fhir-agent',
+            'apiPath': '/Observation',
+            'httpMethod': 'GET',
+            'messageVersion': '1.0'
+        }
+        response = function_api_response(event, 200, "Successfully retrieved observations.")
+        # Returns a dictionary with the formatted response structure.
+    """
+    actionGroup = event['actionGroup']
+    apiPath = event['apiPath']
+    httpMethod = event['httpMethod']
+    messageVersion = event['messageVersion']
+
     responseBody = {
         "TEXT": {
-            "body": bodyText
+            "body": responseText
         }
     }
-
-    # Define the function for logging purposes
-    function = f"{actionGroup}.{apiPath}.{httpMethod}"
 
     action_response = {
         'actionGroup': actionGroup,
         'apiPath': apiPath,
         'httpMethod': httpMethod,
-        'httpStatusCode': 200,
+        'httpStatusCode': statusCode,
         'responseBody': responseBody
-
     }
 
-    function_api_response = {'response': action_response, 'messageVersion': messageVersion}
-    #print("Response: {}".format(function_api_response))
-
-    return function_api_response
-
+    api_response = {'response': action_response, 'messageVersion': messageVersion}
+    return api_response
 
 def fetch_and_combine_fhir_results(initial_bundle, event):
     """
@@ -144,14 +183,15 @@ def fetch_and_combine_fhir_results(initial_bundle, event):
     entries = combined_bundle.get("entry", [])  # Collect the initial entries
     logger.info(f"Current #entries before combine: {len(entries)}")
 
-    # Add initial entries to unique_ids to avoid duplicates
     unique_ids = {}
+
+    # Add initial entries to unique_ids to avoid duplicates
     for entry in entries:
         entry_id = entry.get('resource', {}).get('id')
         if entry_id:
             unique_ids[entry_id] = 1
 
-    # Follow the 'next' link if it exists. There seems to be a bug where next URLs are generated no matter what for some resources.
+    # Follow the 'next' link if it exists
     next_url = get_next_url(combined_bundle)
     
     signer = get_aws_sigv4(id_token)
@@ -163,11 +203,7 @@ def fetch_and_combine_fhir_results(initial_bundle, event):
     for param in parameters:
         if param.get('name') in ['_count', 'count']:
             param_count = int(param.get('value', None))
-
-    if param_count and len(entries) >= param_count:
-        logger.info(f"Reached the param_count limit: {param_count}")
-        return(combined_bundle)
-
+    
     next_count = 0
     while next_url:
         next_count = 1
@@ -197,7 +233,7 @@ def fetch_and_combine_fhir_results(initial_bundle, event):
     
         next_bundle = r.json()
 
-        # Combine the entries from the next bundle with the existing entries, after deduping
+        # Combine the entries from the next bundle with the existing entries
         new_entries = next_bundle.get("entry", [])
         added_entries = 0
         deduped_entries = 0
@@ -453,45 +489,3 @@ def get_aws_sigv4(id_token):
     credentials = session.get_credentials().get_frozen_credentials()
     signer = SigV4Auth(credentials, 'healthlake', region)
     return signer
-
-def hash_json_entry(json_entry):
-    """
-    Hashes a JSON entry to produce a unique hash value.
-
-    Args:
-        json_entry (dict): The JSON entry to be hashed.
-
-    Returns:
-        str: A hash value representing the JSON entry.
-    """
-    # Serialize the JSON entry to a canonical string
-    json_string = json.dumps(json_entry, sort_keys=True)
-    
-    # Hash the serialized string using SHA-256
-    hash_object = hashlib.sha256(json_string.encode('utf-8'))
-    
-    # Return the hexadecimal representation of the hash
-    return hash_object.hexdigest()
-
-def add_entry_to_dict(json_entry, entry_dict):
-    """
-    Adds a JSON entry to a dictionary if it is not already present.
-
-    Args:
-        json_entry (dict): The JSON entry to add.
-        entry_dict (dict): The dictionary to store unique JSON entries.
-
-    Returns:
-        bool: True if the entry was added, False if it was a duplicate.
-    """
-    # Hash the JSON entry
-    entry_hash = hash_json_entry(json_entry)
-    
-    # Check if the hash already exists in the dictionary
-    if entry_hash not in entry_dict:
-        # If not, add the entry and return True
-        entry_dict[entry_hash] = json_entry.id
-        return True
-    else:
-        logger.warning(f"Resource {json_entry.id} detected! Deduped")
-        return False

@@ -33,7 +33,7 @@ function ChatFrame() {
                     </select></div>
             </div>
             <div className="content">
-                <h1>Preventative Care App Demo</h1>
+                <h2>Team 20 Preventative Care App Demo</h2>
                 <ChatForm patientId={selectedPatientId} />
             </div>
         </div>
